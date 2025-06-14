@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +24,7 @@
         .header {
             background-color: #18181b;
             padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .header h1 {
@@ -110,6 +111,7 @@
                 opacity: 0;
                 transform: translateX(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -137,8 +139,31 @@
 
         .username {
             font-weight: bold;
-            color: #9147ff;
             margin-right: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .username:hover {
+            text-decoration: underline;
+        }
+
+        .chat-message.banned {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .chat-message.toxic {
+            background-color: #3d1a1a;
+            border-left: 3px solid #ff4444;
+        }
+
+        .ban-notification {
+            color: #ff4444;
+            font-style: italic;
+            font-size: 12px;
+            padding: 4px 8px;
+            animation: slideIn 0.3s ease-out;
         }
 
         .timestamp {
@@ -195,10 +220,105 @@
             animation: none;
         }
 
+        .quiz-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .quiz-content {
+            background-color: #18181b;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            border: 2px solid #9147ff;
+        }
+
+        .quiz-content h2 {
+            color: #9147ff;
+            margin-bottom: 20px;
+        }
+
+        .quiz-question {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #efeff1;
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .quiz-option {
+            background-color: #2f2f35;
+            padding: 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .quiz-option:hover {
+            background-color: #3f3f45;
+            border-color: #9147ff;
+        }
+
+        .quiz-option.correct {
+            background-color: #1a3d1a;
+            border-color: #00ff00;
+        }
+
+        .quiz-option.incorrect {
+            background-color: #3d1a1a;
+            border-color: #ff0000;
+        }
+
+        .quiz-option.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .quiz-feedback {
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .quiz-feedback.correct {
+            color: #00ff00;
+        }
+
+        .quiz-feedback.incorrect {
+            color: #ff0000;
+        }
+
+        .quiz-progress {
+            color: #adadb8;
+            margin-bottom: 10px;
+        }
+
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         button {
@@ -235,41 +355,47 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>Twitch Chat Simulator</h1>
-        <a href="https://github.com/yourusername/twitch-chat-simulator" class="github-link" target="_blank">View on GitHub</a>
-        
+        <a href="https://github.com/yourusername/twitch-chat-simulator" class="github-link" target="_blank">View on
+            GitHub</a>
+
         <div class="controls">
             <div class="control-group">
                 <label for="msgRate">Messages per Minute</label>
                 <input type="range" id="msgRate" min="10" max="200" value="60">
                 <span class="control-value" id="msgRateValue">60</span>
             </div>
-            
+
             <div class="control-group">
                 <label for="questionRate">Question Rate (%)</label>
                 <input type="range" id="questionRate" min="0" max="50" value="15">
                 <span class="control-value" id="questionRateValue">15%</span>
             </div>
-            
+
             <div class="control-group">
                 <label for="emoteRate">Emote Spam (%)</label>
                 <input type="range" id="emoteRate" min="0" max="70" value="25">
                 <span class="control-value" id="emoteRateValue">25%</span>
             </div>
-            
+
             <div class="control-group">
                 <label for="burstMode">Burst Mode</label>
                 <input type="checkbox" id="burstMode" checked>
             </div>
-            
+
             <div class="control-group">
                 <button id="startBtn" onclick="toggleSimulator()">Start</button>
             </div>
+
+            <div class="control-group">
+                <button id="quizBtn" onclick="startQuiz()" disabled>Start Quiz</button>
+            </div>
         </div>
     </div>
-    
+
     <div class="main-container">
         <div class="chat-container">
             <div class="chat-header">
@@ -278,7 +404,7 @@
             </div>
             <div class="chat-messages" id="chatMessages"></div>
         </div>
-        
+
         <div class="stats-container">
             <h2>Statistics</h2>
             <div class="stat-item">
@@ -301,9 +427,33 @@
                 <span class="stat-label">Burst Mode:</span>
                 <span class="stat-value" id="burstStatus">OFF</span>
             </div>
+            <div class="stat-item">
+                <span class="stat-label">Correct Bans:</span>
+                <span class="stat-value" id="correctBans">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">False Bans:</span>
+                <span class="stat-value" id="incorrectBans">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Ban Accuracy:</span>
+                <span class="stat-value" id="banAccuracy">-</span>
+            </div>
         </div>
     </div>
-
+    <div id="quizModal" class="quiz-modal" style="display: none;">
+        <div class="quiz-content">
+            <h2>Chat Attention Quiz</h2>
+            <div id="quizQuestion" class="quiz-question"></div>
+            <div id="quizOptions" class="quiz-options"></div>
+            <div id="quizFeedback" class="quiz-feedback"></div>
+            <div class="quiz-progress">
+                Question <span id="questionNumber">1</span> of 5
+            </div>
+            <button id="nextQuestionBtn" onclick="nextQuestion()" style="display: none;">Next Question</button>
+            <button id="finishQuizBtn" onclick="finishQuiz()" style="display: none;">Finish Quiz</button>
+        </div>
+    </div>
     <script>
         // Message data
         const TWITCH_MESSAGES = {
@@ -314,7 +464,8 @@
             memes_copypasta: ["!drop", "!claim", "VAC", "RIGGED", "clip it", "I WAS HERE", "SCRIPT", "paid actor", "my streamer", "NOT MY STREAMER", "L + ratio", "skill issue", "touch grass", "no shot", "on god fr fr"],
             subscriber_messages: ["SUB HYPE", "RESUB 12 MONTHS BABY", "gifted sub POG", "PRIME SUB", "tier 3 btw", "6 months PogU", "GIFT MORE SUBS", "sub train lets go", "HYPE TRAIN", "thank you for the sub!"],
             bits_donations: ["Cheer100 great stream!", "Cheer50", "Cheer1000 LOVE YOUR CONTENT", "uni10 uni10 uni10", "Party100 Party100", "ShowLove500", "Cheer250 keep it up!"],
-            spam_patterns: ["LUL LUL LUL LUL LUL", "777777777", "W W W W W", "L L L L L", "CHAT CHAT CHAT", "TRUE", "BASED", "GIGACHAD", "ANY TRUERS?", "I HECKIN LOVE THIS STREAM"]
+            spam_patterns: ["LUL LUL LUL LUL LUL", "777777777", "W W W W W", "L L L L L", "CHAT CHAT CHAT", "TRUE", "BASED", "GIGACHAD", "ANY TRUERS?", "I HECKIN LOVE THIS STREAM"],
+            toxic_messages: ["cringe", "boring", "dead stream", "L streamer", "fell off", "washed", "0/10 gameplay", "trash player", "uninstall", "so bad", "boosted", "hardstuck", "you suck", "garbage", "worst player ever", "quit streaming"],
         };
 
         const LOL_QUESTIONS = [
@@ -326,12 +477,34 @@
 
         const USERNAME_PATTERNS = [
             "xX{word}Xx", "{word}{number}", "{word}_{word}", "TTV{word}", "{word}Gaming",
-            "Its{word}", "{word}Main", "Not{word}", "{word}TV", "Real{word}"
+            "Its{word}", "{word}Main", "Not{word}", "{word}TV", "Real{word}",
+            "{word}{year}", "Dark{word}", "Pro{word}", "{word}Plays", "{word}_YT",
+            "I_am_{word}", "{word}OnTwitch", "The{word}", "{word}Live", "Just{word}",
+            "{word}_{number}", "Only{word}", "{word}TTV", "Hey{word}", "{word}Gamer"
         ];
 
         const USERNAME_WORDS = [
+            // Original gaming-themed words
             "Shadow", "Dragon", "Ninja", "Sniper", "Ghost", "Phoenix", "Storm", "Wolf",
-            "Eagle", "Titan", "Blaze", "Frost", "Viper", "Reaper", "Knight", "Warrior"
+            "Eagle", "Titan", "Blaze", "Frost", "Viper", "Reaper", "Knight", "Warrior",
+            "Hunter", "Savage", "Legend", "Master", "Ultra", "Mega", "Alpha", "Prime",
+
+            // Additional gaming words
+            "Ace", "Apex", "Chaos", "Cosmic", "Cyber", "Dark", "Death", "Demon",
+            "Divine", "Doom", "Dream", "Elite", "Epic", "Eternal", "Exile", "Fallen",
+            "Fatal", "Fire", "Fury", "Galaxy", "Giga", "Glory", "Golden", "Grim",
+            "Havoc", "Hero", "Hyper", "Ice", "Immortal", "Impact", "Iron", "Jade",
+            "Killer", "King", "Light", "Lightning", "Lunar", "Magic", "Mystic", "Neon",
+            "Night", "Nova", "Omega", "Oracle", "Phantom", "Power", "Psycho", "Pulse",
+            "Queen", "Rage", "Rapid", "Raven", "Rebel", "Red", "Royal", "Rune",
+            "Saint", "Saber", "Shade", "Silver", "Sky", "Solar", "Soul", "Space",
+            "Spark", "Speed", "Star", "Steel", "Stone", "Strike", "Super", "Swift",
+            "Sword", "Terror", "Thunder", "Toxic", "Turbo", "Twilight", "Ultimate", "Valor",
+            "Venom", "Void", "Wicked", "Wild", "Wind", "Winter", "Wise", "Zero",
+
+            // Common gaming terms
+            "Noob", "Pro", "Boss", "Tank", "DPS", "Support", "Carry", "Jungler",
+            "Mid", "Top", "ADC", "Feeder", "Smurf", "Main", "OTP", "Troll"
         ];
 
         // Simulator state
@@ -352,32 +525,74 @@
                 burstMultiplier: 3.0,
                 burstDuration: 10000,
                 burstCooldown: 60000
-            }
+            },
+            userColors: {},
+            bannedUsers: {},     // Track banned users
+            correctBans: 0,      // Toxic messages banned
+            incorrectBans: 0,    // Non-toxic messages banned
+            toxicMessagesSent: 0, // Total toxic messages
+            messageHistory: [],      // Store all messages with metadata
+            quizActive: false,       // Is quiz currently active
+            quizScore: 0,           // Current quiz score
+            quizQuestions: [],      // Current quiz questions
+            currentQuizIndex: 0,    // Current question index
         };
 
         // Utility functions
+        function getUsernameColor(username) {
+            // Check if we already have a color for this user
+            if (simulator.userColors[username]) {
+                return simulator.userColors[username];
+            }
+
+            // Twitch-like colors that are visible on dark background
+            const colors = [
+                '#FF0000', '#0000FF', '#00FF00', '#B22222', '#FF7F50',
+                '#9ACD32', '#FF4500', '#2E8B57', '#DAA520', '#D2691E',
+                '#5F9EA0', '#1E90FF', '#FF69B4', '#8A2BE2', '#00FF7F',
+                '#FF1493', '#00CED1', '#FFD700', '#FF6347', '#40E0D0',
+                '#EE82EE', '#F0E68C', '#DDA0DD', '#FF00FF', '#00FFFF',
+                '#20B2AA', '#87CEEB', '#778899', '#FFDAB9', '#48D1CC'
+            ];
+
+            // Assign a random color and store it
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            simulator.userColors[username] = color;
+
+            return color;
+        }
+
         function generateUsername() {
             const pattern = USERNAME_PATTERNS[Math.floor(Math.random() * USERNAME_PATTERNS.length)];
-            const word = USERNAME_WORDS[Math.floor(Math.random() * USERNAME_WORDS.length)];
+            const word1 = USERNAME_WORDS[Math.floor(Math.random() * USERNAME_WORDS.length)];
+            const word2 = USERNAME_WORDS[Math.floor(Math.random() * USERNAME_WORDS.length)];
             const number = Math.floor(Math.random() * 1000);
-            
-            return pattern
-                .replace('{word}', word)
-                .replace('{number}', number);
+            const year = 90 + Math.floor(Math.random() * 35); // 90-24 for years
+
+            let username = pattern
+                .replace('{number}', number)
+                .replace('{year}', year);
+
+            // Replace first {word} with word1
+            username = username.replace('{word}', word1);
+            // Replace second {word} (if exists) with word2
+            username = username.replace('{word}', word2);
+
+            return username;
         }
 
         function getOrCreateUser() {
             const currentTime = Date.now();
-            
+
             // Clean up inactive users
             Object.keys(simulator.activeUsers).forEach(user => {
                 if (currentTime - simulator.activeUsers[user] > 300000) {
                     delete simulator.activeUsers[user];
                 }
             });
-            
+
             // Use existing user or create new
-            const activeUsersList = Object.keys(simulator.activeUsers);
+            const activeUsersList = Object.keys(simulator.activeUsers).filter(user => !simulator.bannedUsers[user]);
             if (activeUsersList.length > 0 && Math.random() < 0.7) {
                 const user = activeUsersList[Math.floor(Math.random() * activeUsersList.length)];
                 if (!simulator.userCooldowns[user] || currentTime > simulator.userCooldowns[user]) {
@@ -386,7 +601,7 @@
                     return user;
                 }
             }
-            
+
             const newUser = generateUsername();
             simulator.activeUsers[newUser] = currentTime;
             simulator.userCooldowns[newUser] = currentTime + (3000 + Math.random() * 12000);
@@ -395,36 +610,44 @@
 
         function getRandomMessage() {
             const rand = Math.random() * 100;
-            
+
+            if (Math.random() < 0.03) { // 3% chance
+                simulator.toxicMessagesSent++;
+                return {
+                    text: TWITCH_MESSAGES.toxic_messages[Math.floor(Math.random() * TWITCH_MESSAGES.toxic_messages.length)],
+                    type: 'toxic'
+                };
+            }
+
             if (rand < simulator.config.questionPercentage) {
                 simulator.questionsAsked++;
                 if (Math.random() < 0.6) {
-                    return { 
-                        text: LOL_QUESTIONS[Math.floor(Math.random() * LOL_QUESTIONS.length)], 
-                        type: 'question' 
+                    return {
+                        text: LOL_QUESTIONS[Math.floor(Math.random() * LOL_QUESTIONS.length)],
+                        type: 'question'
                     };
                 } else {
-                    return { 
-                        text: TWITCH_MESSAGES.questions[Math.floor(Math.random() * TWITCH_MESSAGES.questions.length)], 
-                        type: 'question' 
+                    return {
+                        text: TWITCH_MESSAGES.questions[Math.floor(Math.random() * TWITCH_MESSAGES.questions.length)],
+                        type: 'question'
                     };
                 }
             }
-            
+
             if (rand < 2) {
-                return { 
-                    text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)], 
-                    type: 'donation' 
+                return {
+                    text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)],
+                    type: 'donation'
                 };
             }
-            
+
             if (rand < 5) {
-                return { 
-                    text: TWITCH_MESSAGES.subscriber_messages[Math.floor(Math.random() * TWITCH_MESSAGES.subscriber_messages.length)], 
-                    type: 'subscription' 
+                return {
+                    text: TWITCH_MESSAGES.subscriber_messages[Math.floor(Math.random() * TWITCH_MESSAGES.subscriber_messages.length)],
+                    type: 'subscription'
                 };
             }
-            
+
             // Regular messages with weighted selection
             const weights = {
                 greetings: 5,
@@ -433,49 +656,121 @@
                 memes_copypasta: 15,
                 spam_patterns: 5
             };
-            
+
             const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
             let random = Math.random() * totalWeight;
-            
+
             for (const [category, weight] of Object.entries(weights)) {
                 random -= weight;
                 if (random <= 0) {
-                    return { 
-                        text: TWITCH_MESSAGES[category][Math.floor(Math.random() * TWITCH_MESSAGES[category].length)], 
-                        type: 'chat' 
+                    return {
+                        text: TWITCH_MESSAGES[category][Math.floor(Math.random() * TWITCH_MESSAGES[category].length)],
+                        type: 'chat'
                     };
                 }
             }
-            
+
             return { text: "default message", type: 'chat' };
         }
 
         function addMessage(username, message, type) {
+            simulator.messageHistory.push({
+                timestamp: new Date(),
+                username: username,
+                message: message,
+                type: type,
+                isBanned: false
+            });
+
+            // Keep only last 200 messages in history
+            if (simulator.messageHistory.length > 200) {
+                simulator.messageHistory.shift();
+            }
+
+            // Enable quiz button after enough messages
+            if (simulator.messageHistory.length >= 50 && !simulator.quizActive) {
+                document.getElementById('quizBtn').disabled = false;
+            }
             const chatContainer = document.getElementById('chatMessages');
             const messageEl = document.createElement('div');
             messageEl.className = `chat-message ${type}`;
-            
+
             const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-            messageEl.innerHTML = `
-                <span class="timestamp">${time}</span>
-                <span class="username">${username}:</span>
-                <span>${message}</span>
-            `;
-            
+            const userColor = getUsernameColor(username);
+
+            // Create elements separately to add click handler
+            const timestampEl = document.createElement('span');
+            timestampEl.className = 'timestamp';
+            timestampEl.textContent = time;
+
+            const usernameEl = document.createElement('span');
+            usernameEl.className = 'username';
+            usernameEl.style.color = userColor;
+            usernameEl.textContent = username + ':';
+            usernameEl.onclick = () => banUser(username, type === 'toxic');
+
+            const messageTextEl = document.createElement('span');
+            messageTextEl.textContent = ' ' + message;
+
+            messageEl.appendChild(timestampEl);
+            messageEl.appendChild(usernameEl);
+            messageEl.appendChild(messageTextEl);
+
             chatContainer.appendChild(messageEl);
-            
+
             // Keep only last 100 messages
             while (chatContainer.children.length > 100) {
                 chatContainer.removeChild(chatContainer.firstChild);
             }
-            
+
             // Auto-scroll to bottom
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        function banUser(username, isToxic) {
+            if (simulator.bannedUsers[username]) {
+                return; // Already banned
+            }
+
+            // Ban the user
+            simulator.bannedUsers[username] = true;
+            delete simulator.activeUsers[username];
+            delete simulator.userCooldowns[username];
+
+            // Track ban accuracy
+            if (isToxic) {
+                simulator.correctBans++;
+            } else {
+                simulator.incorrectBans++;
+            }
+
+            // Visual feedback - mark all messages from this user as banned
+            const messages = document.querySelectorAll('.chat-message');
+            messages.forEach(msg => {
+                const usernameEl = msg.querySelector('.username');
+                if (usernameEl && usernameEl.textContent === username + ':') {
+                    msg.classList.add('banned');
+                }
+            });
+
+            // Add ban notification
+            const chatContainer = document.getElementById('chatMessages');
+            const banNotif = document.createElement('div');
+            banNotif.className = 'ban-notification';
+            banNotif.textContent = `🔨 ${username} has been banned`;
+            chatContainer.appendChild(banNotif);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            simulator.messageHistory.forEach(msg => {
+                if (msg.username === username) {
+                    msg.isBanned = true;
+                }
+            });
+        }
+
         function checkBurstMode() {
             const currentTime = Date.now();
-            
+
             if (simulator.inBurstMode) {
                 if (currentTime - simulator.lastBurstTime > simulator.config.burstDuration) {
                     simulator.inBurstMode = false;
@@ -492,14 +787,14 @@
 
         function generateMessages() {
             if (!simulator.running) return;
-            
+
             if (simulator.config.burstModeEnabled) {
                 checkBurstMode();
             }
-            
+
             const username = getOrCreateUser();
             const { text, type } = getRandomMessage();
-            
+
             simulator.totalMessages++;
             addMessage(username, text, type);
             updateStats();
@@ -509,30 +804,37 @@
             document.getElementById('totalMessages').textContent = simulator.totalMessages;
             document.getElementById('activeUsers').textContent = Object.keys(simulator.activeUsers).length;
             document.getElementById('questionsAsked').textContent = simulator.questionsAsked;
-            
+
             const currentRate = simulator.config.messagesPerMinute * (simulator.inBurstMode ? simulator.config.burstMultiplier : 1);
             document.getElementById('currentRate').textContent = `${Math.round(currentRate)} msg/min`;
             document.getElementById('burstStatus').textContent = simulator.inBurstMode ? 'ON' : 'OFF';
+            document.getElementById('correctBans').textContent = simulator.correctBans;
+            document.getElementById('incorrectBans').textContent = simulator.incorrectBans;
+
+            const totalBans = simulator.correctBans + simulator.incorrectBans;
+            const accuracy = totalBans > 0 ? Math.round((simulator.correctBans / totalBans) * 100) : 0;
+            document.getElementById('banAccuracy').textContent = totalBans > 0 ? accuracy + '%' : '-';
+
         }
 
         function startSimulator() {
             simulator.running = true;
-            
+
             const baseDelay = 60000 / simulator.config.messagesPerMinute;
-            
+
             function scheduleNextMessage() {
                 if (!simulator.running) return;
-                
+
                 const delay = baseDelay / (simulator.inBurstMode ? simulator.config.burstMultiplier : 1);
                 const variance = delay * 0.2;
                 const actualDelay = delay + (Math.random() - 0.5) * variance;
-                
+
                 setTimeout(() => {
                     generateMessages();
                     scheduleNextMessage();
                 }, actualDelay);
             }
-            
+
             scheduleNextMessage();
         }
 
@@ -542,7 +844,7 @@
 
         function toggleSimulator() {
             const btn = document.getElementById('startBtn');
-            
+
             if (simulator.running) {
                 stopSimulator();
                 btn.textContent = 'Start';
@@ -550,6 +852,237 @@
                 startSimulator();
                 btn.textContent = 'Stop';
             }
+        }
+
+        function generateQuizQuestions() {
+            const questions = [];
+            const history = simulator.messageHistory;
+
+            // Question type 1: Who asked this question?
+            const questionMessages = history.filter(msg => msg.type === 'question' && !msg.isBanned);
+            if (questionMessages.length >= 3) {
+                const targetMsg = questionMessages[Math.floor(Math.random() * questionMessages.length)];
+                const otherUsers = [...new Set(history.map(m => m.username))]
+                    .filter(u => u !== targetMsg.username && !simulator.bannedUsers[u])
+                    .slice(0, 3);
+
+                if (otherUsers.length >= 3) {
+                    questions.push({
+                        type: 'who_asked',
+                        question: `Who asked: "${targetMsg.message}"?`,
+                        correct: targetMsg.username,
+                        options: shuffleArray([targetMsg.username, ...otherUsers]),
+                        explanation: `${targetMsg.username} asked this question`
+                    });
+                }
+            }
+
+            // Question type 2: Who got banned for this message?
+            const bannedMessages = history.filter(msg => msg.isBanned && msg.type === 'toxic');
+            if (bannedMessages.length >= 1) {
+                const targetMsg = bannedMessages[Math.floor(Math.random() * bannedMessages.length)];
+                const otherUsers = [...new Set(history.map(m => m.username))]
+                    .filter(u => u !== targetMsg.username)
+                    .slice(0, 3);
+
+                if (otherUsers.length >= 3) {
+                    questions.push({
+                        type: 'who_banned',
+                        question: `Who got banned for saying: "${targetMsg.message}"?`,
+                        correct: targetMsg.username,
+                        options: shuffleArray([targetMsg.username, ...otherUsers]),
+                        explanation: `${targetMsg.username} was banned for this toxic message`
+                    });
+                }
+            }
+
+            // Question type 3: Who was the most active chatter?
+            const messageCounts = {};
+            history.forEach(msg => {
+                if (!msg.isBanned) {
+                    messageCounts[msg.username] = (messageCounts[msg.username] || 0) + 1;
+                }
+            });
+
+            const sortedChatters = Object.entries(messageCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            if (sortedChatters.length >= 4) {
+                const topChatter = sortedChatters[0];
+                const otherChatters = sortedChatters.slice(1, 4);
+
+                questions.push({
+                    type: 'most_active',
+                    question: `One user sent ${topChatter[1]} messages. Which chatter was it?`,
+                    correct: topChatter[0],
+                    options: shuffleArray([topChatter[0], ...otherChatters.map(c => c[0])]),
+                    explanation: `${topChatter[0]} sent ${topChatter[1]} messages`
+                });
+            }
+
+            // Question type 4: How many questions were asked?
+            const totalQuestions = history.filter(msg => msg.type === 'question').length;
+            if (totalQuestions >= 5) {
+                const correctAnswer = totalQuestions;
+                const options = [
+                    correctAnswer,
+                    Math.max(1, correctAnswer - Math.floor(Math.random() * 5) - 1),
+                    correctAnswer + Math.floor(Math.random() * 5) + 1,
+                    Math.max(1, correctAnswer - Math.floor(Math.random() * 8) - 3)
+                ].sort((a, b) => a - b);
+
+                questions.push({
+                    type: 'question_count',
+                    question: `How many questions have been asked in total?`,
+                    correct: correctAnswer.toString(),
+                    options: options.map(n => n.toString()),
+                    explanation: `${correctAnswer} questions were asked`
+                });
+            }
+
+            // Question type 5: Who sent the most recent donation?
+            const donations = history.filter(msg => msg.type === 'donation');
+            if (donations.length >= 1) {
+                const lastDonation = donations[donations.length - 1];
+                const otherUsers = [...new Set(history.map(m => m.username))]
+                    .filter(u => u !== lastDonation.username)
+                    .slice(0, 3);
+
+                if (otherUsers.length >= 3) {
+                    questions.push({
+                        type: 'last_donation',
+                        question: `Who sent the most recent donation/bits?`,
+                        correct: lastDonation.username,
+                        options: shuffleArray([lastDonation.username, ...otherUsers]),
+                        explanation: `${lastDonation.username} sent: "${lastDonation.message}"`
+                    });
+                }
+            }
+
+            // Shuffle and return 5 questions
+            return shuffleArray(questions).slice(0, 5);
+        }
+
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function startQuiz() {
+            if (simulator.messageHistory.length < 50) {
+                alert('Not enough chat history yet! Keep watching the chat.');
+                return;
+            }
+
+            // Generate questions
+            simulator.quizQuestions = generateQuizQuestions();
+            if (simulator.quizQuestions.length < 5) {
+                alert('Not enough variety in chat yet for a full quiz. Try again later!');
+                return;
+            }
+
+            // Initialize quiz
+            simulator.quizActive = true;
+            simulator.quizScore = 0;
+            simulator.currentQuizIndex = 0;
+
+            // Disable buttons during quiz
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('quizBtn').disabled = true;
+
+            // Show quiz modal
+            document.getElementById('quizModal').style.display = 'flex';
+
+            // Display first question
+            displayQuestion();
+        }
+
+        function displayQuestion() {
+            const question = simulator.quizQuestions[simulator.currentQuizIndex];
+
+            document.getElementById('quizQuestion').textContent = question.question;
+            document.getElementById('questionNumber').textContent = simulator.currentQuizIndex + 1;
+
+            const optionsContainer = document.getElementById('quizOptions');
+            optionsContainer.innerHTML = '';
+
+            question.options.forEach(option => {
+                const optionEl = document.createElement('div');
+                optionEl.className = 'quiz-option';
+                optionEl.textContent = option;
+                optionEl.onclick = () => selectAnswer(option);
+                optionsContainer.appendChild(optionEl);
+            });
+
+            document.getElementById('quizFeedback').textContent = '';
+            document.getElementById('nextQuestionBtn').style.display = 'none';
+        }
+
+        function selectAnswer(answer) {
+            const question = simulator.quizQuestions[simulator.currentQuizIndex];
+            const options = document.querySelectorAll('.quiz-option');
+
+            // Disable all options
+            options.forEach(opt => {
+                opt.classList.add('disabled');
+                opt.onclick = null;
+
+                if (opt.textContent === answer) {
+                    if (answer === question.correct) {
+                        opt.classList.add('correct');
+                        simulator.quizScore++;
+                    } else {
+                        opt.classList.add('incorrect');
+                    }
+                }
+
+                if (opt.textContent === question.correct) {
+                    opt.classList.add('correct');
+                }
+            });
+
+            // Show feedback
+            const feedback = document.getElementById('quizFeedback');
+            if (answer === question.correct) {
+                feedback.textContent = 'Correct! ' + question.explanation;
+                feedback.className = 'quiz-feedback correct';
+            } else {
+                feedback.textContent = 'Incorrect. ' + question.explanation;
+                feedback.className = 'quiz-feedback incorrect';
+            }
+
+            // Show next button
+            if (simulator.currentQuizIndex < 4) {
+                document.getElementById('nextQuestionBtn').style.display = 'inline-block';
+            } else {
+                document.getElementById('finishQuizBtn').style.display = 'inline-block';
+            }
+        }
+
+        function nextQuestion() {
+            simulator.currentQuizIndex++;
+            document.getElementById('nextQuestionBtn').style.display = 'none';
+            displayQuestion();
+        }
+
+        function finishQuiz() {
+            const percentage = (simulator.quizScore / 5) * 100;
+            alert(`Quiz Complete!\n\nScore: ${simulator.quizScore}/5 (${percentage}%)\n\n${percentage >= 80 ? 'Excellent attention!' :
+                percentage >= 60 ? 'Good job!' :
+                    percentage >= 40 ? 'Not bad, but room for improvement.' :
+                        'You might want to pay more attention to the chat!'
+                }`);
+
+            // Reset quiz
+            document.getElementById('quizModal').style.display = 'none';
+            simulator.quizActive = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('finishQuizBtn').style.display = 'none';
         }
 
         // Control handlers
@@ -576,4 +1109,5 @@
         setInterval(updateStats, 1000);
     </script>
 </body>
+
 </html>
