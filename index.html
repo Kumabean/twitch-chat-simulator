@@ -132,6 +132,11 @@
             border-left: 3px solid #00ff00;
         }
 
+        .chat-message.dollar-donation {
+            background-color: #1a3d3d;
+            border-left: 3px solid #00ffff;
+        }
+
         .chat-message.subscription {
             background-color: #3d1a3d;
             border-left: 3px solid #ff00ff;
@@ -491,10 +496,18 @@
             greetings: ["hey chat", "FIRST", "Hello everyone!", "yooooo", "wassup", "Hi stream!", "Evening chat", "sup", "heyyyy", "o/"],
             emotes_spam: ["PogChamp PogChamp PogChamp", "Kappa", "KEKW", "OMEGALUL", "monkaS", "pepeLaugh", "5Head", "EZ Clap", "POGGERS", "WeirdChamp", "Sadge", "peepoHappy", "COPIUM", "modCheck", "NODDERS"],
             gameplay_reactions: ["CLUTCH!", "THROW", "gg", "F", "RIP", "SAVED", "WHAT A PLAY", "HOW DID YOU MISS THAT", "calculated", "LETS GOOOOO", "nice shot", "that was clean", "unlucky", "outplayed", "GET REKT", "DESTROYED", "diff", "??????", "NOOOOOO", "YES YES YES"],
-            questions: ["what game is this?", "rank?", "how long have you been streaming?", "can you play with viewers?", "what's your setup?", "PC specs?", "sens?", "crosshair settings?", "how old are you?", "where are you from?"],
+            questions: ["what game is this?", "rank?", "how long have you been streaming?", "can you play with viewers?", "what's your setup?", "PC specs?", "sens?", "how old are you?", "where are you from?"],
             memes_copypasta: ["!drop", "!claim", "VAC", "RIGGED", "clip it", "I WAS HERE", "SCRIPT", "paid actor", "my streamer", "NOT MY STREAMER", "L + ratio", "skill issue", "touch grass", "no shot", "on god fr fr"],
             subscriber_messages: ["SUB HYPE", "RESUB 12 MONTHS BABY", "gifted sub POG", "PRIME SUB", "tier 3 btw", "6 months PogU", "GIFT MORE SUBS", "sub train lets go", "HYPE TRAIN", "thank you for the sub!"],
             bits_donations: ["Cheer100 great stream!", "Cheer50", "Cheer1000 LOVE YOUR CONTENT", "uni10 uni10 uni10", "Party100 Party100", "ShowLove500", "Cheer250 keep it up!"],
+            dollar_donations: [
+                "$3.00 keep it up!", "$5.00 love the stream", "$10.00 you're amazing!",
+                "$20.00 best streamer ever", "$25.00 here's for a pizza", "$50.00 POG CONTENT",
+                "$100.00 LETS GOOOOO", "$200.00 you deserve this king", "$500.00 absolute legend",
+                "$1000.00 GIGACHAD DONATION", "$15.00 thanks for the entertainment",
+                "$30.00 keep grinding!", "$75.00 favorite streamer!", "$420.69 nice",
+                "$69.00 nice", "$7.77 lucky sevens", "$13.37 leet donation"
+            ],
             spam_patterns: ["LUL LUL LUL LUL LUL", "777777777", "W W W W W", "L L L L L", "CHAT CHAT CHAT", "TRUE", "BASED", "GIGACHAD", "ANY TRUERS?", "I HECKIN LOVE THIS STREAM"],
             toxic_messages: ["cringe", "boring", "dead stream", "L streamer", "fell off", "washed", "0/10 gameplay", "trash player", "uninstall", "so bad", "boosted", "hardstuck", "you suck", "garbage", "worst player ever", "quit streaming"],
         };
@@ -643,8 +656,6 @@
         }
 
         function getRandomMessage() {
-            const rand = Math.random() * 100;
-
             if (Math.random() < (simulator.config.toxicChance || 3) / 100) {
                 simulator.toxicMessagesSent++;
                 return {
@@ -653,7 +664,37 @@
                 };
             }
 
-            if (rand < simulator.config.questionPercentage) {
+            const rand = Math.random() * 100;
+            const donationEnd = simulator.config.donationChance || 5;
+            const subscriptionEnd = donationEnd + 5;
+            const questionEnd = subscriptionEnd + simulator.config.questionPercentage;
+
+            // Check in order of ranges
+            if (rand < donationEnd) {
+                // 50/50 chance between bits and dollar donations
+                if (Math.random() < 0.5) {
+                    return {
+                        text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)],
+                        type: 'donation'
+                    };
+                } else {
+                    const dollarMsg = TWITCH_MESSAGES.dollar_donations[Math.floor(Math.random() * TWITCH_MESSAGES.dollar_donations.length)];
+                    return {
+                        text: dollarMsg,
+                        type: 'dollar-donation',
+                        amount: parseFloat(dollarMsg.match(/\$(\d+(?:\.\d+)?)/)[1])
+                    };
+                }
+            }
+
+            if (rand < subscriptionEnd) {
+                return {
+                    text: TWITCH_MESSAGES.subscriber_messages[Math.floor(Math.random() * TWITCH_MESSAGES.subscriber_messages.length)],
+                    type: 'subscription'
+                };
+            }
+
+            if (rand < questionEnd) {
                 simulator.questionsAsked++;
                 if (Math.random() < 0.6) {
                     return {
@@ -666,20 +707,6 @@
                         type: 'question'
                     };
                 }
-            }
-
-            if (rand < (simulator.config.donationChance || 2)) {
-                return {
-                    text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)],
-                    type: 'donation'
-                };
-            }
-
-            if (rand < 5) {
-                return {
-                    text: TWITCH_MESSAGES.subscriber_messages[Math.floor(Math.random() * TWITCH_MESSAGES.subscriber_messages.length)],
-                    type: 'subscription'
-                };
             }
 
             // Regular messages with weighted selection
@@ -707,13 +734,15 @@
             return { text: "default message", type: 'chat' };
         }
 
+
         function addMessage(username, message, type) {
             simulator.messageHistory.push({
                 timestamp: new Date(),
                 username: username,
                 message: message,
                 type: type,
-                isBanned: false
+                isBanned: false,
+                amount: type === 'dollar-donation' ? parseFloat(message.match(/\$(\d+(?:\.\d+)?)/)[1]) : 0
             });
 
             // Keep only last 200 messages in history
@@ -736,6 +765,13 @@
             const timestampEl = document.createElement('span');
             timestampEl.className = 'timestamp';
             timestampEl.textContent = time;
+
+            if (type === 'dollar-donation') {
+                const dollarEl = document.createElement('span');
+                dollarEl.textContent = '💵 ';
+                dollarEl.style.marginRight = '4px';
+                messageEl.insertBefore(dollarEl, timestampEl);
+            }
 
             const usernameEl = document.createElement('span');
             usernameEl.className = 'username';
@@ -1008,6 +1044,70 @@
                         explanation: `${lastDonation.username} sent: "${lastDonation.message}"`
                     });
                 }
+            }
+
+            // Question type 6: Who donated the most money?
+            const dollarDonations = history.filter(msg => msg.type === 'dollar-donation' && msg.amount);
+            if (dollarDonations.length >= 3) {
+                // Find the highest donation
+                const highestDonation = dollarDonations.reduce((max, current) =>
+                    current.amount > max.amount ? current : max
+                );
+
+                // Get other donors for options
+                const otherDonors = dollarDonations
+                    .filter(d => d.username !== highestDonation.username)
+                    .map(d => d.username);
+
+                // Add some non-donors if needed
+                const nonDonors = [...new Set(history.map(m => m.username))]
+                    .filter(u => !dollarDonations.some(d => d.username === u))
+                    .slice(0, 3);
+
+                const allOptions = [...new Set([...otherDonors, ...nonDonors])].slice(0, 3);
+
+                if (allOptions.length >= 3) {
+                    questions.push({
+                        type: 'highest_donation',
+                        question: `Who made the highest donation of $${highestDonation.amount.toFixed(2)}?`,
+                        correct: highestDonation.username,
+                        options: shuffleArray([highestDonation.username, ...allOptions]),
+                        explanation: `${highestDonation.username} donated $${highestDonation.amount.toFixed(2)}`
+                    });
+                }
+            }
+
+            // Question type 7: Total donations from a user
+            const donationsByUser = {};
+            dollarDonations.forEach(d => {
+                donationsByUser[d.username] = (donationsByUser[d.username] || 0) + d.amount;
+            });
+
+            const topDonors = Object.entries(donationsByUser)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            if (topDonors.length >= 2) {
+                const [topDonor, topAmount] = topDonors[0];
+                const roundedAmount = Math.round(topAmount);
+
+                // Create fake amounts for wrong answers
+                const fakeAmounts = [
+                    Math.round(topAmount * 0.5),
+                    Math.round(topAmount * 1.5),
+                    Math.round(topAmount * 0.75),
+                    Math.round(topAmount * 2)
+                ].filter(amt => amt !== roundedAmount);
+
+                const options = shuffleArray([roundedAmount, ...fakeAmounts.slice(0, 3)]);
+
+                questions.push({
+                    type: 'total_donated',
+                    question: `How much has ${topDonor} donated in total?`,
+                    correct: roundedAmount.toString(),
+                    options: options.map(n => n.toString()),
+                    explanation: `${topDonor} donated a total of $${topAmount.toFixed(2)}`
+                });
             }
 
             // Shuffle and return 5 questions
