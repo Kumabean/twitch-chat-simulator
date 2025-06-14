@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitch Chat Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0e0e10;
+            color: #efeff1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #18181b;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #9147ff;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            color: #adadb8;
+        }
+
+        .control-group input[type="range"] {
+            width: 150px;
+        }
+
+        .control-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+
+        .control-value {
+            font-size: 14px;
+            color: #9147ff;
+            font-weight: bold;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            flex: 1;
+            background-color: #18181b;
+            border: 1px solid #2f2f35;
+            margin: 20px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+        }
+
+        .chat-header {
+            padding: 10px;
+            background-color: #1f1f23;
+            border-bottom: 1px solid #2f2f35;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .chat-message {
+            padding: 4px 8px;
+            border-radius: 4px;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .chat-message:hover {
+            background-color: #2f2f35;
+        }
+
+        .chat-message.question {
+            background-color: #1f1f23;
+            border-left: 3px solid #9147ff;
+        }
+
+        .chat-message.donation {
+            background-color: #1a3d1a;
+            border-left: 3px solid #00ff00;
+        }
+
+        .chat-message.subscription {
+            background-color: #3d1a3d;
+            border-left: 3px solid #ff00ff;
+        }
+
+        .username {
+            font-weight: bold;
+            color: #9147ff;
+            margin-right: 8px;
+        }
+
+        .timestamp {
+            color: #6d6d79;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+
+        .stats-container {
+            background-color: #18181b;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 4px;
+            border: 1px solid #2f2f35;
+            min-width: 250px;
+        }
+
+        .stats-container h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #9147ff;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #1f1f23;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            color: #adadb8;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #efeff1;
+        }
+
+        .burst-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff0000;
+            margin-left: 10px;
+            animation: pulse 1s infinite;
+        }
+
+        .burst-indicator.inactive {
+            background-color: #6d6d79;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        button {
+            background-color: #9147ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #7c2ff2;
+        }
+
+        button:disabled {
+            background-color: #6d6d79;
+            cursor: not-allowed;
+        }
+
+        .github-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #9147ff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .github-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Twitch Chat Simulator</h1>
+        <a href="https://github.com/yourusername/twitch-chat-simulator" class="github-link" target="_blank">View on GitHub</a>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="msgRate">Messages per Minute</label>
+                <input type="range" id="msgRate" min="10" max="200" value="60">
+                <span class="control-value" id="msgRateValue">60</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="questionRate">Question Rate (%)</label>
+                <input type="range" id="questionRate" min="0" max="50" value="15">
+                <span class="control-value" id="questionRateValue">15%</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="emoteRate">Emote Spam (%)</label>
+                <input type="range" id="emoteRate" min="0" max="70" value="25">
+                <span class="control-value" id="emoteRateValue">25%</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="burstMode">Burst Mode</label>
+                <input type="checkbox" id="burstMode" checked>
+            </div>
+            
+            <div class="control-group">
+                <button id="startBtn" onclick="toggleSimulator()">Start</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="chat-container">
+            <div class="chat-header">
+                Chat
+                <span id="burstIndicator" class="burst-indicator inactive"></span>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+        </div>
+        
+        <div class="stats-container">
+            <h2>Statistics</h2>
+            <div class="stat-item">
+                <span class="stat-label">Total Messages:</span>
+                <span class="stat-value" id="totalMessages">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Active Users:</span>
+                <span class="stat-value" id="activeUsers">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Questions Asked:</span>
+                <span class="stat-value" id="questionsAsked">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Current Rate:</span>
+                <span class="stat-value" id="currentRate">0 msg/min</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Burst Mode:</span>
+                <span class="stat-value" id="burstStatus">OFF</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Message data
+        const TWITCH_MESSAGES = {
+            greetings: ["hey chat", "FIRST", "Hello everyone!", "yooooo", "wassup", "Hi stream!", "Evening chat", "sup", "heyyyy", "o/"],
+            emotes_spam: ["PogChamp PogChamp PogChamp", "Kappa", "KEKW", "OMEGALUL", "monkaS", "pepeLaugh", "5Head", "EZ Clap", "POGGERS", "WeirdChamp", "Sadge", "peepoHappy", "COPIUM", "modCheck", "NODDERS"],
+            gameplay_reactions: ["CLUTCH!", "THROW", "gg", "F", "RIP", "SAVED", "WHAT A PLAY", "HOW DID YOU MISS THAT", "calculated", "LETS GOOOOO", "nice shot", "that was clean", "unlucky", "outplayed", "GET REKT", "DESTROYED", "diff", "??????", "NOOOOOO", "YES YES YES"],
+            questions: ["what game is this?", "rank?", "how long have you been streaming?", "can you play with viewers?", "what's your setup?", "PC specs?", "sens?", "crosshair settings?", "how old are you?", "where are you from?"],
+            memes_copypasta: ["!drop", "!claim", "VAC", "RIGGED", "clip it", "I WAS HERE", "SCRIPT", "paid actor", "my streamer", "NOT MY STREAMER", "L + ratio", "skill issue", "touch grass", "no shot", "on god fr fr"],
+            subscriber_messages: ["SUB HYPE", "RESUB 12 MONTHS BABY", "gifted sub POG", "PRIME SUB", "tier 3 btw", "6 months PogU", "GIFT MORE SUBS", "sub train lets go", "HYPE TRAIN", "thank you for the sub!"],
+            bits_donations: ["Cheer100 great stream!", "Cheer50", "Cheer1000 LOVE YOUR CONTENT", "uni10 uni10 uni10", "Party100 Party100", "ShowLove500", "Cheer250 keep it up!"],
+            spam_patterns: ["LUL LUL LUL LUL LUL", "777777777", "W W W W W", "L L L L L", "CHAT CHAT CHAT", "TRUE", "BASED", "GIGACHAD", "ANY TRUERS?", "I HECKIN LOVE THIS STREAM"]
+        };
+
+        const LOL_QUESTIONS = [
+            "what rank are you?", "peak rank?", "how to climb?", "best role to climb?", "best champs to climb?",
+            "main champion?", "how many mastery points?", "one trick?", "champion pool?", "runes?", "build?",
+            "matchup tips?", "who do you ban?", "flash on D or F?", "macro tips?", "cs per minute?",
+            "when to roam?", "ward placement?", "jungle path?", "current meta?", "thoughts on patch?"
+        ];
+
+        const USERNAME_PATTERNS = [
+            "xX{word}Xx", "{word}{number}", "{word}_{word}", "TTV{word}", "{word}Gaming",
+            "Its{word}", "{word}Main", "Not{word}", "{word}TV", "Real{word}"
+        ];
+
+        const USERNAME_WORDS = [
+            "Shadow", "Dragon", "Ninja", "Sniper", "Ghost", "Phoenix", "Storm", "Wolf",
+            "Eagle", "Titan", "Blaze", "Frost", "Viper", "Reaper", "Knight", "Warrior"
+        ];
+
+        // Simulator state
+        let simulator = {
+            running: false,
+            intervalId: null,
+            totalMessages: 0,
+            questionsAsked: 0,
+            activeUsers: {},
+            userCooldowns: {},
+            inBurstMode: false,
+            lastBurstTime: 0,
+            config: {
+                messagesPerMinute: 60,
+                questionPercentage: 15,
+                emoteSpamPercentage: 25,
+                burstModeEnabled: true,
+                burstMultiplier: 3.0,
+                burstDuration: 10000,
+                burstCooldown: 60000
+            }
+        };
+
+        // Utility functions
+        function generateUsername() {
+            const pattern = USERNAME_PATTERNS[Math.floor(Math.random() * USERNAME_PATTERNS.length)];
+            const word = USERNAME_WORDS[Math.floor(Math.random() * USERNAME_WORDS.length)];
+            const number = Math.floor(Math.random() * 1000);
+            
+            return pattern
+                .replace('{word}', word)
+                .replace('{number}', number);
+        }
+
+        function getOrCreateUser() {
+            const currentTime = Date.now();
+            
+            // Clean up inactive users
+            Object.keys(simulator.activeUsers).forEach(user => {
+                if (currentTime - simulator.activeUsers[user] > 300000) {
+                    delete simulator.activeUsers[user];
+                }
+            });
+            
+            // Use existing user or create new
+            const activeUsersList = Object.keys(simulator.activeUsers);
+            if (activeUsersList.length > 0 && Math.random() < 0.7) {
+                const user = activeUsersList[Math.floor(Math.random() * activeUsersList.length)];
+                if (!simulator.userCooldowns[user] || currentTime > simulator.userCooldowns[user]) {
+                    simulator.activeUsers[user] = currentTime;
+                    simulator.userCooldowns[user] = currentTime + (3000 + Math.random() * 12000);
+                    return user;
+                }
+            }
+            
+            const newUser = generateUsername();
+            simulator.activeUsers[newUser] = currentTime;
+            simulator.userCooldowns[newUser] = currentTime + (3000 + Math.random() * 12000);
+            return newUser;
+        }
+
+        function getRandomMessage() {
+            const rand = Math.random() * 100;
+            
+            if (rand < simulator.config.questionPercentage) {
+                simulator.questionsAsked++;
+                if (Math.random() < 0.6) {
+                    return { 
+                        text: LOL_QUESTIONS[Math.floor(Math.random() * LOL_QUESTIONS.length)], 
+                        type: 'question' 
+                    };
+                } else {
+                    return { 
+                        text: TWITCH_MESSAGES.questions[Math.floor(Math.random() * TWITCH_MESSAGES.questions.length)], 
+                        type: 'question' 
+                    };
+                }
+            }
+            
+            if (rand < 2) {
+                return { 
+                    text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)], 
+                    type: 'donation' 
+                };
+            }
+            
+            if (rand < 5) {
+                return { 
+                    text: TWITCH_MESSAGES.subscriber_messages[Math.floor(Math.random() * TWITCH_MESSAGES.subscriber_messages.length)], 
+                    type: 'subscription' 
+                };
+            }
+            
+            // Regular messages with weighted selection
+            const weights = {
+                greetings: 5,
+                emotes_spam: simulator.config.emoteSpamPercentage * (simulator.inBurstMode ? 2 : 1),
+                gameplay_reactions: 30,
+                memes_copypasta: 15,
+                spam_patterns: 5
+            };
+            
+            const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (const [category, weight] of Object.entries(weights)) {
+                random -= weight;
+                if (random <= 0) {
+                    return { 
+                        text: TWITCH_MESSAGES[category][Math.floor(Math.random() * TWITCH_MESSAGES[category].length)], 
+                        type: 'chat' 
+                    };
+                }
+            }
+            
+            return { text: "default message", type: 'chat' };
+        }
+
+        function addMessage(username, message, type) {
+            const chatContainer = document.getElementById('chatMessages');
+            const messageEl = document.createElement('div');
+            messageEl.className = `chat-message ${type}`;
+            
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            messageEl.innerHTML = `
+                <span class="timestamp">${time}</span>
+                <span class="username">${username}:</span>
+                <span>${message}</span>
+            `;
+            
+            chatContainer.appendChild(messageEl);
+            
+            // Keep only last 100 messages
+            while (chatContainer.children.length > 100) {
+                chatContainer.removeChild(chatContainer.firstChild);
+            }
+            
+            // Auto-scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function checkBurstMode() {
+            const currentTime = Date.now();
+            
+            if (simulator.inBurstMode) {
+                if (currentTime - simulator.lastBurstTime > simulator.config.burstDuration) {
+                    simulator.inBurstMode = false;
+                    document.getElementById('burstIndicator').classList.add('inactive');
+                }
+            } else {
+                if (currentTime - simulator.lastBurstTime > simulator.config.burstCooldown && Math.random() < 0.05) {
+                    simulator.inBurstMode = true;
+                    simulator.lastBurstTime = currentTime;
+                    document.getElementById('burstIndicator').classList.remove('inactive');
+                }
+            }
+        }
+
+        function generateMessages() {
+            if (!simulator.running) return;
+            
+            if (simulator.config.burstModeEnabled) {
+                checkBurstMode();
+            }
+            
+            const username = getOrCreateUser();
+            const { text, type } = getRandomMessage();
+            
+            simulator.totalMessages++;
+            addMessage(username, text, type);
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('totalMessages').textContent = simulator.totalMessages;
+            document.getElementById('activeUsers').textContent = Object.keys(simulator.activeUsers).length;
+            document.getElementById('questionsAsked').textContent = simulator.questionsAsked;
+            
+            const currentRate = simulator.config.messagesPerMinute * (simulator.inBurstMode ? simulator.config.burstMultiplier : 1);
+            document.getElementById('currentRate').textContent = `${Math.round(currentRate)} msg/min`;
+            document.getElementById('burstStatus').textContent = simulator.inBurstMode ? 'ON' : 'OFF';
+        }
+
+        function startSimulator() {
+            simulator.running = true;
+            
+            const baseDelay = 60000 / simulator.config.messagesPerMinute;
+            
+            function scheduleNextMessage() {
+                if (!simulator.running) return;
+                
+                const delay = baseDelay / (simulator.inBurstMode ? simulator.config.burstMultiplier : 1);
+                const variance = delay * 0.2;
+                const actualDelay = delay + (Math.random() - 0.5) * variance;
+                
+                setTimeout(() => {
+                    generateMessages();
+                    scheduleNextMessage();
+                }, actualDelay);
+            }
+            
+            scheduleNextMessage();
+        }
+
+        function stopSimulator() {
+            simulator.running = false;
+        }
+
+        function toggleSimulator() {
+            const btn = document.getElementById('startBtn');
+            
+            if (simulator.running) {
+                stopSimulator();
+                btn.textContent = 'Start';
+            } else {
+                startSimulator();
+                btn.textContent = 'Stop';
+            }
+        }
+
+        // Control handlers
+        document.getElementById('msgRate').addEventListener('input', (e) => {
+            simulator.config.messagesPerMinute = parseInt(e.target.value);
+            document.getElementById('msgRateValue').textContent = e.target.value;
+        });
+
+        document.getElementById('questionRate').addEventListener('input', (e) => {
+            simulator.config.questionPercentage = parseInt(e.target.value);
+            document.getElementById('questionRateValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('emoteRate').addEventListener('input', (e) => {
+            simulator.config.emoteSpamPercentage = parseInt(e.target.value);
+            document.getElementById('emoteRateValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('burstMode').addEventListener('change', (e) => {
+            simulator.config.burstModeEnabled = e.target.checked;
+        });
+
+        // Update stats every second
+        setInterval(updateStats, 1000);
+    </script>
+</body>
+</html>
