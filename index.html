@@ -307,6 +307,35 @@
             margin-bottom: 10px;
         }
 
+        .auto-scroll-indicator {
+            float: right;
+            font-size: 12px;
+            color: #adadb8;
+            font-weight: normal;
+            background-color: #2f2f35;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .resume-scroll-button {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: #9147ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .resume-scroll-button:hover {
+            background-color: #7c2ff2;
+        }
+
         @keyframes pulse {
             0% {
                 opacity: 1;
@@ -401,6 +430,8 @@
             <div class="chat-header">
                 Chat
                 <span id="burstIndicator" class="burst-indicator inactive"></span>
+                <span id="autoScrollIndicator" class="auto-scroll-indicator" style="display: none;">Auto-scroll
+                    paused</span>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
         </div>
@@ -524,7 +555,9 @@
                 burstModeEnabled: true,
                 burstMultiplier: 3.0,
                 burstDuration: 10000,
-                burstCooldown: 60000
+                burstCooldown: 60000,
+                donationChance: 5,
+                toxicChance: 5
             },
             userColors: {},
             bannedUsers: {},     // Track banned users
@@ -536,6 +569,7 @@
             quizScore: 0,           // Current quiz score
             quizQuestions: [],      // Current quiz questions
             currentQuizIndex: 0,    // Current question index
+            autoScroll: true,  // Track if auto-scroll is enabled
         };
 
         // Utility functions
@@ -611,7 +645,7 @@
         function getRandomMessage() {
             const rand = Math.random() * 100;
 
-            if (Math.random() < 0.03) { // 3% chance
+            if (Math.random() < (simulator.config.toxicChance || 3) / 100) {
                 simulator.toxicMessagesSent++;
                 return {
                     text: TWITCH_MESSAGES.toxic_messages[Math.floor(Math.random() * TWITCH_MESSAGES.toxic_messages.length)],
@@ -634,7 +668,7 @@
                 }
             }
 
-            if (rand < 2) {
+            if (rand < (simulator.config.donationChance || 2)) {
                 return {
                     text: TWITCH_MESSAGES.bits_donations[Math.floor(Math.random() * TWITCH_MESSAGES.bits_donations.length)],
                     type: 'donation'
@@ -718,13 +752,25 @@
 
             chatContainer.appendChild(messageEl);
 
-            // Keep only last 100 messages
+            // Keep only last 200 messages in history
+            if (simulator.messageHistory.length > 200) {
+                simulator.messageHistory.shift();
+            }
+
+            // Enable quiz button after enough messages
+            if (simulator.messageHistory.length >= 50 && !simulator.quizActive) {
+                document.getElementById('quizBtn').disabled = false;
+            }
+
+            // Keep only last 100 messages in view
             while (chatContainer.children.length > 100) {
                 chatContainer.removeChild(chatContainer.firstChild);
             }
 
-            // Auto-scroll to bottom
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            // Auto-scroll only if enabled
+            if (simulator.autoScroll) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         }
 
         function banUser(username, isToxic) {
@@ -760,6 +806,10 @@
             banNotif.textContent = `🔨 ${username} has been banned`;
             chatContainer.appendChild(banNotif);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            if (simulator.autoScroll) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
 
             simulator.messageHistory.forEach(msg => {
                 if (msg.username === username) {
@@ -1085,6 +1135,52 @@
             document.getElementById('finishQuizBtn').style.display = 'none';
         }
 
+        function checkAutoScroll() {
+            const chatContainer = document.getElementById('chatMessages');
+            const threshold = 50; // pixels from bottom to consider "at bottom"
+
+            const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < threshold;
+
+            if (isAtBottom && !simulator.autoScroll) {
+                // Re-enable auto-scroll
+                simulator.autoScroll = true;
+                document.getElementById('autoScrollIndicator').style.display = 'none';
+
+                // Remove resume button if it exists
+                const resumeBtn = document.getElementById('resumeScrollBtn');
+                if (resumeBtn) {
+                    resumeBtn.remove();
+                }
+            } else if (!isAtBottom && simulator.autoScroll) {
+                // Disable auto-scroll
+                simulator.autoScroll = false;
+                document.getElementById('autoScrollIndicator').style.display = 'inline';
+
+                // Add resume scroll button if it doesn't exist
+                if (!document.getElementById('resumeScrollBtn')) {
+                    const resumeBtn = document.createElement('button');
+                    resumeBtn.id = 'resumeScrollBtn';
+                    resumeBtn.className = 'resume-scroll-button';
+                    resumeBtn.textContent = '↓ Resume auto-scroll';
+                    resumeBtn.onclick = resumeAutoScroll;
+                    chatContainer.parentElement.style.position = 'relative';
+                    chatContainer.parentElement.appendChild(resumeBtn);
+                }
+            }
+        }
+
+        function resumeAutoScroll() {
+            const chatContainer = document.getElementById('chatMessages');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            simulator.autoScroll = true;
+            document.getElementById('autoScrollIndicator').style.display = 'none';
+
+            const resumeBtn = document.getElementById('resumeScrollBtn');
+            if (resumeBtn) {
+                resumeBtn.remove();
+            }
+        }
+
         // Control handlers
         document.getElementById('msgRate').addEventListener('input', (e) => {
             simulator.config.messagesPerMinute = parseInt(e.target.value);
@@ -1104,6 +1200,9 @@
         document.getElementById('burstMode').addEventListener('change', (e) => {
             simulator.config.burstModeEnabled = e.target.checked;
         });
+
+        // Add scroll event listener
+        document.getElementById('chatMessages').addEventListener('scroll', checkAutoScroll);
 
         // Update stats every second
         setInterval(updateStats, 1000);
